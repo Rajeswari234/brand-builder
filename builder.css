@@ -13,3 +13,12 @@
 .resource-controls { display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin:8px 0; }
 .resource-controls button { font-size:12px; }
 @media(max-width:700px) { .builder-tools { padding:8px; } .builder-tools small { width:100%; margin:0; } .builder-tools .page-link { max-width:160px; } }
+#save-page.needs-save::after { content:""; display:inline-block; width:8px; height:8px; margin-left:8px; border-radius:50%; background:#fff; box-shadow:0 0 0 2px #fff6; vertical-align:middle; }
+#github-settings.connected { border-color:#16a34a; color:#166534; }
+#github-settings.connected::before { content:""; display:inline-block; width:7px; height:7px; margin-right:7px; border-radius:50%; background:#16a34a; vertical-align:middle; }
+.builder-tools #live-link { color:#166534; font-size:13px; text-decoration:underline; }
+.github-dialog .hint { font-size:13px; color:#475569; }
+.github-dialog .check { display:flex; gap:8px; align-items:center; }
+.github-dialog .check input { width:auto; margin:0; }
+.github-dialog .github-result { min-height:1.4em; color:#b91c1c; font-size:14px; }
+.github-dialog footer span { flex:1; }

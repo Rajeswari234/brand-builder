@@ -1573,6 +1573,38 @@
         .g4 {
           grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr));
         }
+        /* Card sizes. Wide cards span two columns only where two fit, so phones never scroll sideways. */
+        .grid > [data-span="full"] {
+          grid-column: 1 / -1;
+        }
+        .grid:has(> [data-span="2"]) {
+          container-type: inline-size;
+        }
+        @container (min-width: 420px) {
+          .g4 > [data-span="2"] {
+            grid-column: span 2;
+          }
+        }
+        @container (min-width: 520px) {
+          .g3 > [data-span="2"] {
+            grid-column: span 2;
+          }
+        }
+        @container (min-width: 680px) {
+          .g2 > [data-span="2"] {
+            grid-column: span 2;
+          }
+        }
+        .logo-tile[data-span="2"] .logo-stage {
+          aspect-ratio: 8/3;
+        }
+        .logo-tile[data-span="full"] .logo-stage {
+          aspect-ratio: auto;
+          min-height: 220px;
+        }
+        .logo-tile[data-span] .logo-stage img {
+          max-height: 160px;
+        }
         .pill {
           display: inline-flex;
           align-items: center;
@@ -3354,8 +3386,17 @@
             ta.remove();
           }
         });
+        // External links come from editable projects; only web and mail links may reach an href.
+        const webUrl = (url) => {
+          try {
+            const u = new URL(String(url || "").trim());
+            return ["https:", "http:", "mailto:"].includes(u.protocol) ? u.href : "";
+          } catch (_) {
+            return "";
+          }
+        };
         const linkBtn = (url, label, variant = "secondary") =>
-          url
+          (url = webUrl(url))
             ? `<a class="btn" data-variant="${variant}" data-size="sm" href="${esc(url)}" target="_blank" rel="noopener">${label}</a>`
             : `<span class="btn" data-variant="${variant}" data-size="sm" aria-disabled="true" title="Add this link in the BRAND config">${label} · pending</span>`;
         const fmtDate = (d) =>
@@ -3373,11 +3414,18 @@
             `<g transform="translate(${x} ${y}) scale(${s / 100})"><rect width="100" height="100" rx="${Math.min(30, BRAND.radius * 2.4)}" fill="${mark}"/><circle cx="50" cy="50" r="24" fill="none" stroke="${bgAccent}" stroke-width="11"/><circle cx="50" cy="50" r="8" fill="${bgAccent}"/></g>`;
           if (kind === "symbol")
             return `<svg viewBox="0 0 100 100" width="96" height="96" role="img" aria-label="${n} symbol">${sym(0, 0, 100)}</svg>`;
-          if (kind === "wordmark")
-            return `<svg viewBox="0 0 300 80" width="240" role="img" aria-label="${n} wordmark"><text x="150" y="56" text-anchor="middle" font-family="${fd}" font-weight="700" font-size="54" letter-spacing="-2" fill="${fg}">${n.toLowerCase()}</text></svg>`;
-          if (kind === "stacked")
-            return `<svg viewBox="0 0 220 190" width="170" role="img" aria-label="${n} stacked logo">${sym(70, 0, 80)}<text x="110" y="160" text-anchor="middle" font-family="${fd}" font-weight="700" font-size="48" letter-spacing="-2" fill="${fg}">${n.toLowerCase()}</text></svg>`;
-          return `<svg viewBox="0 0 330 90" width="250" role="img" aria-label="${n} primary logo">${sym(0, 5, 80)}<text x="100" y="64" font-family="${fd}" font-weight="700" font-size="54" letter-spacing="-2" fill="${fg}">${n.toLowerCase()}</text></svg>`;
+          // Widen the viewBox for long names so the placeholder scales down instead of being cut off.
+          const textW = (size) => String(BRAND.client.name || "").length * size * 0.56;
+          if (kind === "wordmark") {
+            const w = Math.max(300, Math.ceil(textW(54) + 20));
+            return `<svg viewBox="0 0 ${w} 80" width="240" role="img" aria-label="${n} wordmark"><text x="${w / 2}" y="56" text-anchor="middle" font-family="${fd}" font-weight="700" font-size="54" letter-spacing="-2" fill="${fg}">${n.toLowerCase()}</text></svg>`;
+          }
+          if (kind === "stacked") {
+            const w = Math.max(220, Math.ceil(textW(48) + 20));
+            return `<svg viewBox="0 0 ${w} 190" width="170" role="img" aria-label="${n} stacked logo">${sym((w - 80) / 2, 0, 80)}<text x="${w / 2}" y="160" text-anchor="middle" font-family="${fd}" font-weight="700" font-size="48" letter-spacing="-2" fill="${fg}">${n.toLowerCase()}</text></svg>`;
+          }
+          const w = Math.max(330, Math.ceil(100 + textW(54) + 10));
+          return `<svg viewBox="0 0 ${w} 90" width="250" role="img" aria-label="${n} primary logo">${sym(0, 5, 80)}<text x="100" y="64" font-family="${fd}" font-weight="700" font-size="54" letter-spacing="-2" fill="${fg}">${n.toLowerCase()}</text></svg>`;
         }
         // variant: 'full' (default), 'light' (for dark/brand backgrounds), 'dark' (one-color dark)
         const logoSrc = (l, variant) =>
@@ -3452,7 +3500,8 @@
         const dlBtn = (f, label = "Download", variant = "secondary") =>
           f && f.src
             ? f.external
-              ? `<a class="btn" data-variant="${variant}" data-size="sm" href="${esc(f.src)}" target="_blank" rel="noopener">${label} ↗</a>`
+              ? webUrl(f.src) &&
+                `<a class="btn" data-variant="${variant}" data-size="sm" href="${esc(webUrl(f.src))}" target="_blank" rel="noopener">${label} ↗</a>`
               : `<a class="btn" data-variant="${variant}" data-size="sm" href="${esc(f.src)}" download="${esc(f.name || "")}">${label}</a>`
             : "";
         // Files made in the browser (palette, code kit): a Blob link the client downloads directly.
@@ -3691,10 +3740,18 @@
     }</div></div></div>`,
             )
             .join("");
-          const reversed = `
-    <div class="logo-tile"><div class="logo-stage" style="background:${P.brand[600]}">${logoFor(logoByKind("primary"), "#FFFFFF", "#FFFFFF", P.brand[600], "light")}</div><div class="logo-meta"><div><b>On brand color</b><small>Mono light</small></div></div></div>
-    <div class="logo-tile"><div class="logo-stage" style="background:${P.neutral[950]}">${logoFor(logoByKind("primary"), "#FFFFFF", P.brand[300], P.neutral[950], "light")}</div><div class="logo-meta"><div><b>On dark</b><small>Full color, reversed</small></div></div></div>
-    <div class="logo-tile"><div class="logo-stage" style="background:${P.accent[200]}">${logoFor(logoByKind("primary"), P.neutral[950], P.neutral[950], P.accent[200], "dark")}</div><div class="logo-meta"><div><b>On accent</b><small>Mono dark</small></div></div></div>`;
+          // Background cards are editable; the first three default to brand, dark and accent.
+          const bgFills = { "Brand color": P.brand[600], Dark: P.neutral[950], Accent: P.accent[200], White: "#FFFFFF" };
+          const reversed = (BRAND.backgrounds || [])
+            .map((b, index) => {
+              const fill = bgFills[b.fill] || b.color || "#FFFFFF",
+                light = b.variant === "light";
+              const fg = light ? "#FFFFFF" : P.neutral[950],
+                mark = light ? (b.fill === "Dark" ? P.brand[300] : "#FFFFFF") : b.variant === "dark" ? P.neutral[950] : P.brand[600];
+              const shownLogo = BRAND.logos.find((l) => b.logo && l.name === b.logo) || logoByKind("primary");
+              return `<div class="logo-tile" data-card-list="backgrounds" data-card-index="${index}"><div class="logo-stage" style="background:${esc(fill)}">${logoFor(shownLogo, fg, mark, fill, b.variant)}</div><div class="logo-meta"><div><b>${esc(b.name)}</b><small>${esc(b.note)}</small></div></div></div>`;
+            })
+            .join("");
           const misuse = [
             ["Don’t stretch", "transform:scaleX(1.5)"],
             ["Don’t recolor", "filter:hue-rotate(140deg)"],
@@ -3708,7 +3765,7 @@
             .join("");
           return `<section id="logo">${head("Identity", "Logo", "Choose by the space you have. Wide space gets the Primary, square space gets the Stacked, anything under 32px gets the Symbol.")}
   <div class="grid g4">${tiles}</div>
-  ${part("logo.backgrounds") ? `<h3 class="sub">Backgrounds</h3><div class="grid g3">${reversed}</div>` : ""}
+  ${part("logo.backgrounds") && reversed ? `<h3 class="sub">Backgrounds</h3><div class="grid g3">${reversed}</div>` : ""}
   ${
     part("logo.clearspace")
       ? `<h3 class="sub">Clear space and minimum size</h3>
@@ -4144,7 +4201,7 @@
         $("#side-name").textContent = C.name;
         $("#side-ver").textContent = `Brand system ${C.version}`;
         $("#side-agency").innerHTML =
-          `Delivered by <a href="${esc(BRAND.agency.url)}" target="_blank" rel="noopener">${esc(BRAND.agency.name)}</a>`;
+          `Delivered by <a href="${esc(webUrl(BRAND.agency.url))}" target="_blank" rel="noopener">${esc(BRAND.agency.name)}</a>`;
         const RENDER = {
           welcome,
           brand,
@@ -4173,13 +4230,25 @@
             `<a href="#${id}" data-id="${id}">${l}<span>${String(SECTIONS.findIndex((s) => s[0] === id) + 1).padStart(2, "0")}</span></a>`,
         ).join("");
         $("#main").innerHTML = VISIBLE.map(([id]) => RENDER[id]()).join("");
+        // Card sizes chosen in the builder: "2" spans two columns, "full" spans the row.
+        function applyCardSizes() {
+          document.querySelectorAll("[data-card-list]").forEach((card) => {
+            const item = (BRAND[card.dataset.cardList] || [])[Number(card.dataset.cardIndex)];
+            if (item && item.span) card.dataset.span = item.span;
+          });
+        }
+        applyCardSizes();
         // Stable keys preserve ordering for background/example/info cards as well.
         document.querySelectorAll('#main > section').forEach(section => {
           section.querySelectorAll('.grid').forEach((grid, groupIndex) => {
             if (grid.children.length < 2 || [...grid.children].some(card => card.dataset.cardList)) return;
             const key = section.id + ':' + groupIndex;
             grid.dataset.layoutGrid = key;
-            [...grid.children].forEach((card, index) => { card.dataset.layoutCard = String(index); });
+            [...grid.children].forEach((card, index) => {
+              card.dataset.layoutCard = String(index);
+              const size = BRAND.cardSizes?.[key + ':' + index];
+              if (size) card.dataset.span = size;
+            });
             const order = BRAND.gridOrders?.[key] || [];
             order.forEach(index => {
               const card = [...grid.children].find(node => node.dataset.layoutCard === String(index));
@@ -4239,6 +4308,7 @@
             .querySelectorAll("#tpl-filter button")
             .forEach((x) => x.setAttribute("aria-pressed", x === b));
           if ($("#tpl-grid")) $("#tpl-grid").innerHTML = templatesInner();
+          applyCardSizes();
         });
 
         // active nav
@@ -4278,6 +4348,7 @@
 
     <link rel="stylesheet" href="builder.css">
     <script src="builder.js"></script>
+    <script src="github.js"></script>
     <script>
       /* ======================================================================
    BRAND BUILDER (standalone)
@@ -4394,6 +4465,18 @@
           const [token, font, w, track, use] = TYPE_META[i];
           return { token, size, lh, m, w, font, track, use };
         });
+      // Background cards in the Logo section. Fills other than "Custom color" follow the brand palette.
+      const BG_FILLS = ["Brand color", "Dark", "Accent", "White", "Custom color"];
+      const BG_VARIANTS = [
+        ["full", "Full color"],
+        ["light", "White / reversed"],
+        ["dark", "Mono dark"],
+      ];
+      const BG_DEFAULTS = () => [
+        { name: "On brand color", note: "Mono light", bg: "Brand color", variant: "White / reversed", logo: "Primary", color: "#FFFFFF" },
+        { name: "On dark", note: "Full color, reversed", bg: "Dark", variant: "White / reversed", logo: "Primary", color: "#FFFFFF" },
+        { name: "On accent", note: "Mono dark", bg: "Accent", variant: "Mono dark", logo: "Primary", color: "#FFFFFF" },
+      ];
       const LOGO_KINDS = [
         ["primary", "Primary", "Default. Horizontal spaces, headers, documents."],
         ["stacked", "Stacked", "Square or tall spaces."],
@@ -4718,6 +4801,8 @@
             light: null,
             dark: null,
           })),
+          backgrounds: BG_DEFAULTS(),
+          cardSizes: {},
           logoMinSize: { digital: "96 px wide", print: "24 mm wide", symbol: "16 px" },
           templates: [
             {
@@ -4847,6 +4932,19 @@
           while (m.views.length < 4) m.views.push({ label: VIEW_LABELS[m.views.length], image: null });
         }
         out.downloads = migrateDownloads(out.downloads);
+        // Older clients had three fixed background cards ordered by gridOrders["logo:1"].
+        if (!Array.isArray(cfg?.backgrounds)) {
+          const presets = BG_DEFAULTS(),
+            order = out.gridOrders?.["logo:1"];
+          out.backgrounds = Array.isArray(order)
+            ? [...order.map((i) => presets[i]), ...presets.filter((_, i) => !order.includes(i))].filter(Boolean)
+            : presets;
+          if (out.gridOrders) {
+            out.gridOrders = { ...out.gridOrders };
+            delete out.gridOrders["logo:1"];
+          }
+        }
+        if (!out.cardSizes || typeof out.cardSizes !== "object") out.cardSizes = {};
         return out;
       }
 
@@ -5127,6 +5225,7 @@
             name: l.name,
             use: l.use,
             kind: l.kind,
+            span: l.span || "",
             src: urlFor(l.full),
             srcLight: urlFor(l.light),
             srcDark: urlFor(l.dark),
@@ -5146,6 +5245,16 @@
             imageName: t.image ? NAMES.tpl(cfg, t, i) : "",
           })),
           gridOrders: cfg.gridOrders || {},
+          cardSizes: cfg.cardSizes || {},
+          backgrounds: (cfg.backgrounds || []).map((b) => ({
+            name: b.name,
+            note: b.note,
+            fill: b.bg,
+            color: validHex(b.color) ? normHex(b.color) : "#FFFFFF",
+            variant: (BG_VARIANTS.find((v) => v[1] === b.variant) || BG_VARIANTS[0])[0],
+            logo: b.logo,
+            span: b.span || "",
+          })),
           resourcePlacement: cfg.resourcePlacement || "downloads",
           downloads: cfg.downloads.map((d) => ({
             ...d,
@@ -5315,6 +5424,7 @@
       function changed() {
         dirty = true;
         setStatus("saving", "Unsaved changes");
+        markPageStale();
         saveSoon();
         queuePreview();
         queueReview();
@@ -5381,6 +5491,7 @@
         renderPanel();
         refreshPreview();
         setStatus("saved", localMode ? "Saved in this browser" : "Saved");
+        updatePageState();
         loadFontSamples();
       }
       async function createClient(config) {
@@ -5413,6 +5524,10 @@
         const id = cur.id;
         saveSoon.cancel();
         dirty = false;
+        if (githubReady() && livePages.has(id)) {
+          try { await unpublishClientFromGithub(id); }
+          catch (error) { toast("Not removed from GitHub · " + error.message, 7000); return; }
+        }
         if (diskAvailable) {
           try { await localRequest('delete', { id }); publishedClients.delete(id); }
           catch (error) { toast(error.message, 5000); return; }
@@ -5685,12 +5800,24 @@
     <div class="drop" data-drop="logos" data-pick="logos" role="button" tabindex="0"><b>Drop logo files here</b><small>SVG or PNG. Drop the whole set at once.</small></div>
     ${C.logos
       .map(
-        (l, i) => `<div class="card"><div class="card-head"><b>${esc(l.name)}</b></div>
+        (l, i) => `<div class="card"><div class="card-head"><b>${esc(l.name)}</b>${l.kind === "custom" ? rowCtl("logos", i, C.logos.length) : ""}</div>
+      ${l.kind === "custom" ? f(`logos.${i}.name`, "Card name") : ""}
       <div class="logo-row">${VARIANTS.map(([v, label, bg]) => slotHTML(`logo:${i}:${v}`, l[v], bg, label)).join("")}</div>
       ${f(`logos.${i}.use`, "When to use it")}</div>`,
       )
       .join("")}
+    <button type="button" class="btn" data-act="add" data-list="logos">Add a logo card</button>
     <p class="hint">The Primary logo’s three versions fill the Backgrounds row, the clear-space and misuse examples, and the logos on every template. The Symbol becomes the sidebar icon.</p>
+    <h3>Backgrounds</h3>
+    ${C.backgrounds
+      .map(
+        (b, i) => `<div class="card"><div class="card-head"><b>${esc(b.name)}</b>${rowCtl("backgrounds", i, C.backgrounds.length)}</div>
+      <div class="row2">${f(`backgrounds.${i}.name`, "Title")}${f(`backgrounds.${i}.note`, "Caption")}</div>
+      <div class="row">${f(`backgrounds.${i}.bg`, "Background", { type: "select", options: BG_FILLS })}${f(`backgrounds.${i}.variant`, "Logo version", { type: "select", options: BG_VARIANTS.map((v) => v[1]) })}${f(`backgrounds.${i}.logo`, "Logo", { type: "select", options: C.logos.map((l) => l.name) })}</div>
+      ${b.bg === "Custom color" ? f(`backgrounds.${i}.color`, "Custom color", { type: "color" }) : ""}</div>`,
+      )
+      .join("")}
+    <button type="button" class="btn" data-act="add" data-list="backgrounds">Add a background</button>
     <h3>Clear space and minimum size</h3>
     <div class="row">${f("logoMinSize.digital", "On screen")}${f("logoMinSize.print", "In print")}${f("logoMinSize.symbol", "Symbol")}</div>`,
         );
@@ -6276,6 +6403,8 @@
           changed();
         }
         if (e.target.matches('select[data-path^="fonts."]')) loadFontSamples();
+        // "Custom color" reveals the background color picker.
+        if (e.target.matches('select[data-path^="backgrounds."][data-path$=".bg"]')) renderPanel();
         if (e.target.dataset.act === "row-type" && cur) {
           const g = +e.target.dataset.g,
             i = +e.target.dataset.i,
@@ -6366,6 +6495,15 @@
           text: "What this pillar means in one sentence.",
           yes: "A line that sounds like us.",
           no: "A line that does not.",
+        }),
+        logos: () => ({ kind: "custom", name: "New logo", use: "", full: null, light: null, dark: null }),
+        backgrounds: () => ({
+          name: "New background",
+          note: "",
+          bg: "White",
+          variant: "Full color",
+          logo: "Primary",
+          color: "#FFFFFF",
         }),
         templates: () => ({
           name: "New template",
