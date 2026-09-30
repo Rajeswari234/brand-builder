@@ -1,0 +1,7 @@
+.server.pid
+/server-*.log
+/clients/*
+/projects/*
+/tests/probe.png
+/tests/artifacts/
+/tests/static-site/
