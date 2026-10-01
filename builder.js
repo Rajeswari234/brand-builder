@@ -144,6 +144,7 @@ async function loadSavedProjects() {
   projectStatus(githubReady() ? `Drafts autosave in browser · Save & publish updates ${github.repo}`
     : diskAvailable ? 'Drafts autosave in browser · Save client page writes local files'
     : 'Browser drafts · Connect GitHub to publish client pages');
+  refreshGithubControls();
   updatePageState();
 }
 
@@ -174,10 +175,30 @@ async function saveClientPage() {
   if (!cur) { toast('Create a client first'); return false; }
   if (projectBusy || workflowBusy || uploading.size) { toast('Please wait for the current save or upload to finish'); return false; }
   if (!diskAvailable && !githubReady()) {
-    await saveSoon.flush();
-    toast('Draft saved in this browser. Connect GitHub to publish the client page.', 5000);
-    requestGithubSettings();
-    return false;
+    const button = document.getElementById('save-page');
+    const id = cur.id;
+    projectBusy = true; button.disabled = true; button.textContent = 'Saving draft...';
+    updateWorkflowStatus();
+    try {
+      if (!db) throw new Error('Browser storage is unavailable. Use Export to download a backup.');
+      // Write even a clean draft so the explicit Save action verifies storage access.
+      dirty = true;
+      await saveSoon.flush();
+      if (dirty || document.getElementById('status').dataset.s === 'error') {
+        throw new Error('The draft could not be fully saved. Check browser storage and try again.');
+      }
+      await saveVersion(id, cur.config, 'Saved browser draft').catch(() => toast('Draft saved, but a history checkpoint could not be stored.'));
+      projectStatus('Draft saved on this device. Export a backup to keep a copy. The shared online page is unchanged.');
+      toast('Saved on this device. No GitHub token needed. Use Export for a downloadable backup.', 6000);
+      return true;
+    } catch (error) {
+      projectStatus('Draft not saved: ' + error.message);
+      toast('Draft not saved: ' + error.message, 7000);
+      return false;
+    } finally {
+      projectBusy = false; button.disabled = false;
+      refreshGithubControls(); updateWorkflowStatus();
+    }
   }
   projectBusy = true;
   updateWorkflowStatus();

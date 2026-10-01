@@ -293,5 +293,8 @@ function refreshGithubControls() {
     button.classList.toggle('connected', githubReady());
   }
   const save = document.getElementById('save-page');
-  if (save && !projectBusy) save.textContent = githubReady() ? 'Save & publish' : 'Save client page';
+  if (save && !projectBusy) {
+    save.textContent = githubReady() ? 'Save & publish' : diskAvailable ? 'Save client page' : 'Save draft';
+    save.title = githubReady() ? 'Publish changes to the shared client page' : diskAvailable ? 'Save the client page on this computer' : 'Save in this browser without a GitHub token';
+  }
 }

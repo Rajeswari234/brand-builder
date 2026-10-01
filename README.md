@@ -67,3 +67,7 @@ Use Drive links for large files. Local Save accepts up to 64 MiB per request, in
 - **Version history** keeps the latest 20 checkpoints per client, including opened drafts, successful page saves/publishes, and named versions you save manually. Restoring first checkpoints the current draft, retains the client's URL, and supports Undo. Publish separately after reviewing the restored draft.
 
 Templates and version history are stored in this browser, alongside the uploaded assets. They do not sync to another browser or travel in project/HTML exports. Clearing site storage removes them. Continue keeping project backups for portability. The new workflow tools are included when publishing or exporting the editor, and excluded from client pages.
+
+## Saving without GitHub
+
+On the hosted editor, when GitHub is not connected, **Save draft** saves on this device without requesting a token. Changes also autosave. Use **Export** or **More > Back up this client** to download a portable copy. Browser drafts do not update the shared online page and do not sync to other devices; clearing site storage removes them. The optional Connect GitHub action is only for publishing.
