@@ -8,6 +8,7 @@ let editGeneration = 0;
 // Clients committed to GitHub whose Pages deploy has not been seen live yet.
 const deployingPages = new Set();
 let arrangeCards = true;
+let editHeadings = false;
 
 function initializeBuilderTools() {
   const tools = document.createElement('div');
@@ -18,6 +19,7 @@ function initializeBuilderTools() {
     <button type="button" class="btn" id="export-site">Export all pages (.zip)</button>
     <button type="button" class="btn" id="github-settings">Connect GitHub</button>
     <label><input type="checkbox" id="arrange-cards" checked> Arrange cards</label>
+    <label><input type="checkbox" id="edit-headings"> Edit headings</label>
     <a id="live-link" class="page-link" target="_blank" rel="noopener" hidden></a>
     <small id="publish-status">Browser drafts · checking local project storage…</small>`;
   document.querySelector('.top').after(tools);
@@ -27,6 +29,7 @@ function initializeBuilderTools() {
   document.getElementById('export-site').onclick = () => exportAllPages();
   document.getElementById('github-settings').onclick = () => requestGithubSettings();
   refreshGithubControls();
+  document.getElementById('edit-headings').onchange = e => { editHeadings = e.target.checked; refreshPreview(); };
   document.getElementById('arrange-cards').onchange = e => {
     arrangeCards = e.target.checked;
     refreshPreview();
@@ -356,6 +359,7 @@ function enhancePanel() {
 }
 
 function enhancePreview(frame) {
+  enhanceHeadingEditor(frame);
   if (!arrangeCards) return;
   const doc = frame.contentDocument;
   if (!doc) return;
@@ -464,4 +468,50 @@ async function exportAllPages() {
     projectStatus(`${entries.length} client pages packaged · ready to upload to GitHub`);
   } catch(error) { toast(error.message,5000); }
   finally { projectBusy=false; }
+}
+
+// Controls live only in the admin preview; exported pages contain text overrides only.
+function enhanceHeadingEditor(frame) {
+  const doc = frame.contentDocument;
+  if (!doc || !editHeadings) return;
+  const style = doc.createElement('style');
+  style.textContent = '[data-heading-key]{outline:1px dashed #f97316;outline-offset:3px;cursor:pointer!important}[data-heading-key]:hover,[data-heading-key]:focus{outline:2px solid #f97316}';
+  doc.head.append(style);
+  doc.querySelectorAll('[data-heading-key]').forEach(node => {
+    node.tabIndex = 0;
+    node.title = 'Click to rename this heading';
+    const open = e => { e.preventDefault(); e.stopPropagation(); editHeading(node); };
+    node.addEventListener('click', open);
+    node.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') open(e); });
+  });
+}
+
+function editHeading(node) {
+  if (!cur || projectBusy || uploading.size) { toast('Wait for saves and uploads to finish'); return; }
+  const client = cur;
+  const key = node.dataset.headingKey;
+  const dialog = document.createElement('dialog');
+  dialog.className = 'local-dialog';
+  dialog.setAttribute('aria-labelledby', 'heading-dialog-title');
+  dialog.innerHTML = '<form><h2 id="heading-dialog-title">Rename heading</h2><label class="f"><span>Heading text</span><input name="heading" required maxlength="240"></label><p class="hint">Applies to this client. Save the client page to publish the change.</p><div class="actions"><button type="button" class="btn" data-reset>Restore default</button><button type="button" class="btn" data-cancel>Cancel</button><button type="submit" class="btn primary">Save heading</button></div></form>';
+  const input = dialog.querySelector('input');
+  input.value = node.textContent.trim();
+  document.body.append(dialog);
+  dialog.addEventListener('close', () => dialog.remove());
+  dialog.querySelector('[data-cancel]').onclick = () => dialog.close();
+  const save = reset => {
+    if (cur !== client || projectBusy || uploading.size) { dialog.close(); return; }
+    const value = input.value.trim();
+    if (!reset && !value) { input.setCustomValidity('Enter a heading.'); input.reportValidity(); return; }
+    client.config.headingOverrides ||= {};
+    if (reset) delete client.config.headingOverrides[key];
+    else client.config.headingOverrides[key] = value;
+    dialog.close();
+    changed();
+  };
+  input.oninput = () => input.setCustomValidity('');
+  dialog.querySelector('[data-reset]').onclick = () => save(true);
+  dialog.querySelector('form').onsubmit = e => { e.preventDefault(); save(false); };
+  dialog.showModal();
+  input.focus(); input.select();
 }

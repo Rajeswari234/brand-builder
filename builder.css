@@ -22,3 +22,5 @@
 .github-dialog .check input { width:auto; margin:0; }
 .github-dialog .github-result { min-height:1.4em; color:#b91c1c; font-size:14px; }
 .github-dialog footer span { flex:1; }
+
+.background-presets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}.background-presets button{border:1px solid #d9dce5;border-radius:8px;padding:6px;background:#fff;color:#172033;font:inherit;font-size:12px;cursor:pointer}.background-presets button[aria-pressed="true"]{border:2px solid #f85a26;padding:5px}.background-presets span{display:block;height:55px;border-radius:5px;margin-bottom:6px}

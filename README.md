@@ -48,3 +48,9 @@ The dashboard commits through the GitHub API, not local git. After publishing, r
 - There is no shared login or real-time collaboration. The PHP file service only accepts requests from this computer and is never used by the hosted site.
 
 Use Drive links for large files. Local Save accepts up to 64 MiB per request, including duplicated base64 data in the editable project and rendered page.
+
+## Backgrounds and headings
+
+- At the top of Welcome, select Classic brand, Aurora, or Midnight grid, or use Upload background image. Image uploads switch the hero to Image automatically; use the overlay and text controls for legibility.
+- Enable Edit headings in the admin toolbar, then click an outlined heading or sidebar label in the preview. Save heading changes its text; Restore default removes the override. Turn Edit headings off to navigate normally.
+- Backgrounds and heading changes belong to each client and are included in saved pages, project backups, and exports. Save/publish the client page to share changes.

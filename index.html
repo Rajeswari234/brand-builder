@@ -3611,7 +3611,13 @@
           let bg = "",
             tone = null;
           if (H.bg === "accent") tone = bg = P.accent[500];
-          else if (H.bg === "dark") tone = bg = dark;
+          else if (H.bg === "aurora") {
+            bg = 'radial-gradient(ellipse at 15% 10%, #367d95 0%, transparent 60%), linear-gradient(135deg, #172f55, #65467c)';
+            tone = '#172f55';
+          } else if (H.bg === "midnight") {
+            bg = 'linear-gradient(#ffffff0d 1px, transparent 1px) 0 0 / 32px 32px, linear-gradient(90deg, #ffffff0d 1px, transparent 1px) 0 0 / 32px 32px, #101c30';
+            tone = '#101c30';
+          } else if (H.bg === "dark") tone = bg = dark;
           else if (H.bg === "light") tone = bg = P.neutral[50];
           else if (H.bg === "custom" && ok(H.color)) tone = bg = H.color;
           else if (H.bg === "gradient" && ok(H.color) && ok(H.color2)) {
@@ -4230,6 +4236,27 @@
             `<a href="#${id}" data-id="${id}">${l}<span>${String(SECTIONS.findIndex((s) => s[0] === id) + 1).padStart(2, "0")}</span></a>`,
         ).join("");
         $("#main").innerHTML = VISIBLE.map(([id]) => RENDER[id]()).join("");
+        // Identify headings before applying saved card order. Assign overrides as text.
+        const headingCounts = new Map();
+        document.querySelectorAll('#main h1, #main h2, #main h3, #main h4, #main h5, #main h6, #main .eyebrow, #main .logo-meta b').forEach(node => {
+          if (node.querySelector('h1,h2,h3,h4,h5,h6,.eyebrow')) return;
+          const original = node.textContent.trim();
+          const base = (node.closest('section')?.id || 'page') + ':' + node.tagName + ':' + original;
+          const occurrence = headingCounts.get(base) || 0;
+          headingCounts.set(base, occurrence + 1);
+          const key = base + ':' + occurrence;
+          node.dataset.headingKey = key;
+          node.dataset.headingDefault = original;
+          if (typeof BRAND.headingOverrides?.[key] === 'string') node.textContent = BRAND.headingOverrides[key];
+        });
+        document.querySelectorAll('#nav a').forEach(link => {
+          const label = document.createElement('span');
+          label.style.cssText = 'display:inline;font:inherit;color:inherit';
+          label.dataset.headingKey = 'nav:' + link.dataset.id;
+          label.dataset.headingDefault = link.firstChild.textContent;
+          label.textContent = BRAND.headingOverrides?.[label.dataset.headingKey] ?? label.dataset.headingDefault;
+          link.replaceChild(label, link.firstChild);
+        });
         // Card sizes chosen in the builder: "2" spans two columns, "full" spans the row.
         function applyCardSizes() {
           document.querySelectorAll("[data-card-list]").forEach((card) => {
@@ -5195,6 +5222,7 @@
           hiddenParts: cfg.hiddenParts,
           scope: cfg.scope,
           hero: { ...cfg.hero, image: urlFor(cfg.hero.image) },
+          headingOverrides: cfg.headingOverrides || {},
           threeD: {
             folder: cfg.threeD.folder?.zip
               ? {
@@ -5666,7 +5694,14 @@
         };
         const H = C.hero;
         const heroControls = `
-    <h3>Hero background</h3>
+    <h3>Background image &amp; style</h3>
+    <p class="hint">Choose a default background or upload your own image. Saved with this client and included in exports.</p>
+    <div class="background-presets" role="group" aria-label="Default backgrounds">
+      <button type="button" data-act="hero-bg" data-v="brand" aria-pressed="${H.bg === 'brand'}"><span style="background:${esc(C.colors.brand)}"></span>Classic brand</button>
+      <button type="button" data-act="hero-bg" data-v="aurora" aria-pressed="${H.bg === 'aurora'}"><span style="background:radial-gradient(ellipse at 15% 10%, #367d95, transparent 60%),linear-gradient(135deg,#172f55,#65467c)"></span>Aurora</button>
+      <button type="button" data-act="hero-bg" data-v="midnight" aria-pressed="${H.bg === 'midnight'}"><span style="background:linear-gradient(#ffffff18 1px,transparent 1px) 0 0/12px 12px,linear-gradient(90deg,#ffffff18 1px,transparent 1px) 0 0/12px 12px,#101c30"></span>Midnight grid</button>
+    </div>
+    <button type="button" class="btn" data-pick="hero">Upload background image</button>
     <p class="hint">The big panel at the top of the dashboard. Change it to show the brand at its best.</p>
     <div class="seg wrap" role="group" aria-label="Hero background">${[
       ["brand", "Brand"],
@@ -5713,13 +5748,13 @@
         const s1 = step(
           "welcome",
           `
+    ${heroControls}
     <div class="row2">${f("client.name", "Short name", { hint: "Sidebar and filenames." })}${f("client.fullName", "Full brand name", { hint: "The big headline." })}</div>
     ${f("client.idea", "Brand idea", { type: "textarea", rows: 2, hint: "Under the headline, and again at the top of Brand." })}
     <div class="row">${f("client.version", "Version")}${f("client.deliveredOn", "Delivered on", { type: "date" })}${f("client.tier", "Tier", { type: "select", options: ["Signature", "Flagship", "Enterprise"] })}${f("client.supportDays", "Support days", { type: "number" })}</div>
     ${f("client.slug", "File prefix", { hint: "Starts every exported filename, e.g. ACME_Logo-Primary_Full-Color_v1.0.svg" })}
     <div class="row2">${f("agency.name", "Your studio name", { hint: "“Delivered by” in the sidebar." })}${f("agency.url", "Studio website", { type: "url", placeholder: "https://" })}</div>
-    ${scopeControls}
-    ${heroControls}`,
+    ${scopeControls}`,
         );
 
         /* 2. Brand */
@@ -6907,7 +6942,7 @@
           const [t, a, b] = key.split(":");
           if (t === "logo") cur.config.logos[+a][b] = ref;
           if (t === "tpl") cur.config.templates[+a].image = ref;
-          if (t === "hero") cur.config.hero.image = ref;
+          if (t === "hero") { cur.config.hero.image = ref; cur.config.hero.bg = "image"; }
           if (t === "view") cur.config.threeD.items[+a].views[+b].image = ref;
           changed();
         } catch (e) {
