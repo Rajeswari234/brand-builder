@@ -54,3 +54,16 @@ Use Drive links for large files. Local Save accepts up to 64 MiB per request, in
 - At the top of Welcome, select Classic brand, Aurora, or Midnight grid, or use Upload background image. Image uploads switch the hero to Image automatically; use the overlay and text controls for legibility.
 - Enable Edit headings in the admin toolbar, then click an outlined heading or sidebar label in the preview. Save heading changes its text; Restore default removes the override. Turn Edit headings off to navigate normally.
 - Backgrounds and heading changes belong to each client and are included in saved pages, project backups, and exports. Save/publish the client page to share changes.
+
+## Editing workflow
+
+- **Undo / Redo** keeps up to 50 edit groups per client while the editor is open. Repeated typing in one field is grouped; a new edit clears redo. Use Ctrl/Cmd+Z and Ctrl/Cmd+Shift+Z outside text fields (text fields keep native undo).
+- The status distinguishes saving a draft, unpublished changes, a locally saved client page, publishing, and the live site updating. Saving a browser draft does not publish it.
+- With an image background, use **Horizontal focal point**, **Vertical focal point**, and **Image zoom** to adjust the crop. The original file is retained. Check the Desktop and Phone previews.
+- **Find settings** (Ctrl/Cmd+K) searches editor fields and jumps to the selected setting.
+- **Client view** hides the settings panel and all preview editing tools. Desktop/Phone preview remains available. Use Back to editor or Escape to return, preserving your editing toggles.
+- **Brand templates** saves named copies of design, content, and uploads. Choose New client beside a template to create an independent client with a new name and URL. Templates can also be deleted from this library.
+- **Publish checklist** brings together missing assets, placeholders, pending or invalid links, and contrast warnings. Save & publish opens it before publishing. Image text readability needs a visual check in both preview sizes; the checklist does not check external link availability.
+- **Version history** keeps the latest 20 checkpoints per client, including opened drafts, successful page saves/publishes, and named versions you save manually. Restoring first checkpoints the current draft, retains the client's URL, and supports Undo. Publish separately after reviewing the restored draft.
+
+Templates and version history are stored in this browser, alongside the uploaded assets. They do not sync to another browser or travel in project/HTML exports. Clearing site storage removes them. Continue keeping project backups for portability. The new workflow tools are included when publishing or exporting the editor, and excluded from client pages.

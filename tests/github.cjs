@@ -97,9 +97,12 @@ function fakeGithub() {
 
     // Publish: one commit with the page, the project, the index, and the editor files.
     await page.locator('#save-page').click();
+    await page.locator('#publish-reviewed').waitFor();
+    assert.equal(await page.evaluate(()=>projectBusy),false,'Checklist opens before publishing starts');
+    await page.locator('#publish-reviewed').click();
     await page.waitForFunction(() => !projectBusy && document.getElementById('publish-status').textContent.startsWith('Saved QA GitHub · published'));
     assert.equal(gh.stats.commits, 1);
-    for (const file of [`projects/${clientId}.json`, `clients/${clientId}/index.html`, 'projects/index.json', 'index.html', 'builder.js', 'builder.css', 'github.js', '.nojekyll'])
+    for (const file of [`projects/${clientId}.json`, `clients/${clientId}/index.html`, 'projects/index.json', 'index.html', 'builder.js', 'builder.css', 'github.js', 'workflow.js', '.nojekyll'])
       assert(gh.files().has(file), `Published ${file}`);
     assert.deepEqual(JSON.parse(gh.read('projects/index.json')).map(e => e.name), ['QA GitHub']);
     for (const [file] of gh.files()) assert(!gh.read(file).includes(TOKEN), `The token must never be committed (${file})`);
@@ -117,6 +120,7 @@ function fakeGithub() {
     await page.waitForFunction(() => document.querySelector('#save-page.needs-save'));
     const uploads = gh.stats.blobUploads;
     await page.locator('#save-page').click();
+    await page.locator('#publish-reviewed').click();
     await page.waitForFunction(() => !projectBusy && document.getElementById('publish-status').textContent.startsWith('Saved QA GitHub edited'));
     assert.equal(gh.stats.commits, 2);
     assert.equal(gh.stats.blobUploads - uploads, 3, 'Only the project, page, and index change');

@@ -34,6 +34,7 @@ function initializeBuilderTools() {
     arrangeCards = e.target.checked;
     refreshPreview();
   };
+  initializeWorkflow();
 }
 
 function markPageStale() {
@@ -41,12 +42,14 @@ function markPageStale() {
   editGeneration++;
   stalePages.add(cur.id);
   updatePageState();
+  updateWorkflowStatus();
 }
 
 // With GitHub connected, "saved" means published to the repository; otherwise saved on disk.
 const pageSaved = id => githubReady() ? livePages.has(id) : publishedClients.has(id);
 
 function updatePageState() {
+  updateWorkflowStatus();
   const button = document.getElementById('save-page');
   const link = document.getElementById('live-link');
   if (link) {
@@ -67,6 +70,7 @@ function updatePageState() {
 }
 
 function projectStatus(message) {
+  updateWorkflowStatus();
   const el = document.getElementById('publish-status');
   if (el) el.textContent = message;
 }
@@ -168,7 +172,7 @@ function projectHtml(project) {
 
 async function saveClientPage() {
   if (!cur) { toast('Create a client first'); return false; }
-  if (projectBusy || uploading.size) { toast('Please wait for the current save or upload to finish'); return false; }
+  if (projectBusy || workflowBusy || uploading.size) { toast('Please wait for the current save or upload to finish'); return false; }
   if (!diskAvailable && !githubReady()) {
     await saveSoon.flush();
     toast('Draft saved in this browser. Connect GitHub to publish the client page.', 5000);
@@ -176,6 +180,7 @@ async function saveClientPage() {
     return false;
   }
   projectBusy = true;
+  updateWorkflowStatus();
   const id = cur.id, config = clone(cur.config), generation = editGeneration;
   const button = document.getElementById('save-page');
   button.disabled = true; button.textContent = 'Saving page…';
@@ -202,6 +207,7 @@ async function saveClientPage() {
       : `Saved ${project.name} · clients/${id}/`);
     document.getElementById('save-page').classList.toggle('needs-save', stalePages.has(id));
     toast(githubReady() ? 'Published to GitHub. The live link updates in about a minute.' : 'Client project and page saved on this computer', 5000);
+    await saveVersion(id, config, githubReady() ? 'Published page' : 'Saved client page').catch(() => toast('Page saved, but a history checkpoint could not be stored.'));
     return true;
   } catch (error) {
     const message = savedLocally ? 'Saved on this computer, but not published · ' + error.message : 'Page not saved · ' + error.message;
@@ -210,6 +216,7 @@ async function saveClientPage() {
     return false;
   } finally {
     projectBusy = false;
+    updateWorkflowStatus();
     button.disabled = false;
     refreshGithubControls();
     const link = document.getElementById('live-link');
@@ -238,7 +245,8 @@ async function copyClientPage() {
   } catch { window.prompt('Copy this client page link', url); }
 }
 
-function requestNewClient() {
+function requestNewClient(template = null) {
+  if (workflowBusy) { toast("Wait for the current operation to finish"); return; }
   if (projectBusy || uploading.size) { toast('Please wait for the current save or upload'); return; }
   const dialog = document.createElement('dialog');
   dialog.className = 'local-dialog';
@@ -252,14 +260,22 @@ function requestNewClient() {
     e.preventDefault();
     const name = dialog.querySelector('input').value.trim();
     if (!name) return;
-    dialog.querySelector('[type=submit]').disabled = true;
-    const cfg = defaultConfig();
-    cfg.client.name = name; cfg.client.fullName = name;
-    cfg.client.slug = safe(name).toUpperCase() || 'CLIENT';
-    cfg.resourcePlacement = 'after-logo';
-    await createClient(cfg);
-    dialog.close();
-    if (diskAvailable || githubReady()) await saveClientPage();
+    const submit = dialog.querySelector('[type=submit]');
+    submit.disabled = true; workflowBusy = true;
+    let created = false;
+    try {
+      const cfg = template ? await hydrateConfig(template.config) : defaultConfig();
+      if (!dialog.open) return;
+      cfg.client.name = name; cfg.client.fullName = name;
+      cfg.client.slug = safe(name).toUpperCase() || 'CLIENT';
+      if (!template) cfg.resourcePlacement = 'after-logo';
+      else { cfg.client.deliveredOn = defaultConfig().client.deliveredOn; cfg.client.version = 'v1.0'; }
+      await createClient(cfg);
+      created = true; dialog.close();
+    } catch(error) { toast('Client could not be created: ' + error.message); }
+    finally { workflowBusy = false; submit.disabled = false; updateWorkflowStatus(); }
+    if (created && githubReady()) showPublishChecklist(true);
+    else if (created && diskAvailable) await saveClientPage();
   };
   dialog.showModal(); dialog.querySelector('input').focus();
 }
@@ -359,6 +375,9 @@ function enhancePanel() {
 }
 
 function enhancePreview(frame) {
+  const previewDoc = frame.contentDocument;
+  if (previewDoc && !previewDoc._workflowKeys) { previewDoc._workflowKeys = true; previewDoc.addEventListener('keydown', workflowShortcut); }
+  if (clientView) return;
   enhanceHeadingEditor(frame);
   if (!arrangeCards) return;
   const doc = frame.contentDocument;

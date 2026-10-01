@@ -1744,6 +1744,16 @@
           position: relative;
           overflow: hidden;
         }
+        .hero-main::before {
+          content: var(--hero-layer, none);
+          position: absolute;
+          inset: 0;
+          background: inherit;
+          background-position: center, var(--hero-x, 50%) var(--hero-y, 50%), center;
+          transform: scale(var(--hero-zoom, 1));
+          transform-origin: var(--hero-x, 50%) var(--hero-y, 50%);
+          pointer-events: none;
+        }
         .hero-main .eyebrow {
           color: inherit;
           opacity: 0.75;
@@ -3609,6 +3619,7 @@
                   ? "#FFFFFF"
                   : dark;
           let bg = "",
+            imageStyle = "",
             tone = null;
           if (H.bg === "accent") tone = bg = P.accent[500];
           else if (H.bg === "aurora") {
@@ -3628,11 +3639,15 @@
           } else if (H.bg === "image" && H.image) {
             const a = Math.max(0, Math.min(0.9, (Number(H.overlay) || 0) / 100));
             bg = `linear-gradient(rgba(0,0,0,${a}), rgba(0,0,0,${a})), url("${H.image}") center / cover no-repeat, ${dark}`;
+            const clamp = (value, low, high, fallback) => Number.isFinite(Number(value)) ? Math.max(low, Math.min(high, Number(value))) : fallback;
+            const x = clamp(H.focalX ?? 50, 0, 100, 50), y = clamp(H.focalY ?? 50, 0, 100, 50);
+            const zoom = clamp(H.zoom ?? 100, 100, 200, 100) / 100;
+            imageStyle = '--hero-layer:"";--hero-x:' + x + '%;--hero-y:' + y + '%;--hero-zoom:' + zoom + ';';
             tone = mix(dark, "#FFFFFF", 0.5 - a * 0.5);
           }
           const fg = tone ? pickText(tone) : H.text === "auto" ? "" : pickText(P.brand[600]);
           const style = (bg ? `background:${bg};` : "") + (fg ? `color:${fg};` : "");
-          return { style, ring: H.ring !== false, light: fg && fg !== "#FFFFFF" };
+          return { style: style + imageStyle, ring: H.ring !== false, light: fg && fg !== "#FFFFFF" };
         }
         const pct = (v) => Math.max(0, Math.min(100, Number(v) || 0));
         function scaleRow(r, nums) {
@@ -4376,6 +4391,7 @@
     <link rel="stylesheet" href="builder.css">
     <script src="builder.js"></script>
     <script src="github.js"></script>
+    <script src="workflow.js"></script>
     <script>
       /* ======================================================================
    BRAND BUILDER (standalone)
@@ -4810,6 +4826,9 @@
             color2: "#E8A33D",
             angle: 135,
             image: null,
+            focalX: 50,
+            focalY: 50,
+            zoom: 100,
             overlay: 35,
             text: "auto",
             ring: true,
@@ -5384,7 +5403,7 @@
       let activeStep = null,
         stepObserver = null,
         followLock = 0;
-      const followOn = () => $("#follow")?.checked !== false;
+      const followOn = () => !clientView && $("#follow")?.checked !== false;
       // After a jump, ignore the scroll observer briefly so a short step (like Spacing) isn't
       // immediately replaced by the step below it.
       const lockFollow = () => (followLock = Date.now() + 900);
@@ -5402,11 +5421,11 @@
           note = $("#pnote");
         const off = C && id !== "welcome" && id !== "review" && !sectionOn(C, id);
         if (note) {
-          note.hidden = !off;
+          note.hidden = !off || clientView;
           if (off)
             note.textContent = `${BUILD_STEPS[stepNo(id) - 1][1]} is hidden from the client’s dashboard${id === "components" && !C.scope.website ? " (no website build in step 1)" : ""}.`;
         }
-        if (!noJump && (followOn() || force)) jumpPreview(dashId(id));
+        if (!clientView && !noJump && (followOn() || force)) jumpPreview(dashId(id));
       }
       // Clicking a link inside the preview moves the builder to the matching step.
       window.addEventListener("message", (e) => {
@@ -5447,9 +5466,11 @@
         const el = $("#status");
         el.dataset.s = s;
         el.querySelector("span").textContent = text;
+        updateWorkflowStatus();
       }
       const saveSoon = debounce(save, 900);
       function changed() {
+        recordEdit();
         dirty = true;
         setStatus("saving", "Unsaved changes");
         markPageStale();
@@ -5476,7 +5497,7 @@
         setStatus("saving", "Saving…");
         try {
           await db.doc("clients/" + cur.id).set(clone(body));
-          setStatus("saved", localMode ? "Saved in this browser" : "Saved");
+          setStatus(dirty ? "saving" : "saved", dirty ? "Saving draft?" : "Draft saved");
         } catch (e) {
           dirty = true;
           setStatus(
@@ -5506,12 +5527,14 @@
         sel.disabled = !list.length;
       }
       async function openClient(id) {
+        if (workflowBusy) { toast("Wait for the current operation to finish"); return; }
         if (dirty) await saveSoon.flush();
         if (!db) return;
         const snap = await db.doc("clients/" + id).get();
         if (!snap.exists) return;
         const data = snap.data();
         cur = { id, config: normalize(clone(data.config)) };
+        beginWorkflowClient();
         lastRev = data.rev;
         dirty = false;
         store.set("bb-client", id);
@@ -5526,9 +5549,11 @@
         if (dirty) await saveSoon.flush();
         const id = "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
         cur = { id, config };
+        seedUndo(true);
         if (!clients.find((c) => c.id === id)) clients.push({ id, name: config.client.name });
         dirty = true;
         await save();
+        beginWorkflowClient();
         store.set("bb-client", id);
         renderClientSelect();
         renderPanel();
@@ -5724,6 +5749,12 @@
     ${
       H.bg === "image"
         ? `${upNote}<div class="hero-slot">${slotHTML("hero", H.image, "bg-check", "Background image")}</div>
+    <div class="image-crop-controls">
+      <p class="hint">Move the focal point and zoom to crop the image without changing the original upload. Check both Desktop and Phone previews.</p>
+      <label class="f"><span>Horizontal focal point: <b data-out="hero.focalX">${esc(H.focalX)}%</b></span><input aria-label="Horizontal focal point" type="range" min="0" max="100" data-path="hero.focalX" value="${esc(H.focalX)}"></label>
+      <label class="f"><span>Vertical focal point: <b data-out="hero.focalY">${esc(H.focalY)}%</b></span><input aria-label="Vertical focal point" type="range" min="0" max="100" data-path="hero.focalY" value="${esc(H.focalY)}"></label>
+      <label class="f"><span>Image zoom: <b data-out="hero.zoom">${esc(H.zoom)}%</b></span><input aria-label="Image zoom" type="range" min="100" max="200" step="5" data-path="hero.zoom" value="${esc(H.zoom)}"></label>
+    </div>
     <label class="f"><span>Darken for legibility: <b data-out="hero.overlay">${esc(H.overlay)}%</b></span><input type="range" min="0" max="80" step="5" data-path="hero.overlay" value="${esc(H.overlay)}"></label>`
         : ""
     }
@@ -6201,7 +6232,7 @@
           if (n) add("warn", `${n} placeholder ${n === 1 ? "text" : "texts"} still to replace`, id);
         // Logos
         const noFull = C.logos.filter((l) => !l.full).map((l) => l.name);
-        if (noFull.length === 4)
+        if (!C.logos.some(l => l.full))
           add("bad", "No logo files yet. The dashboard is showing placeholder marks.", "logo");
         else if (noFull.length) add("warn", `Missing full-color logo: ${noFull.join(", ")}`, "logo");
         if (C.logos[0].full && !C.logos[0].light)
@@ -6232,6 +6263,18 @@
           );
         if (C.proportion.reduce((n, p) => n + (Number(p.pct) || 0), 0) !== 100)
           add("warn", "Color proportion doesn’t add up to 100%", "color");
+        const hero = C.hero;
+        if (hero.bg === 'image' && hero.image) add('info', 'Check image text readability in Desktop and Phone previews; image contrast needs a visual check.', 'welcome');
+        const neutral = ramp(validHex(C.colors.neutral) ? normHex(C.colors.neutral) : '#777777');
+        const accent = ramp(validHex(C.colors.accent) ? normHex(C.colors.accent) : '#777777');
+        const tones = {brand:[br[600]],accent:[accent[500]],dark:[neutral[950]],light:[neutral[50]],custom:[hero.color],gradient:[hero.color,hero.color2],aurora:['#367d95','#172f55','#65467c'],midnight:['#101c30']}[hero.bg];
+        if (tones?.every(validHex) && hero.text !== 'auto') {
+          const foreground = hero.text === 'light' ? '#FFFFFF' : neutral[950];
+          if (Math.min(...tones.map(tone=>contrast(tone,foreground))) < 4.5) add('warn','Hero text may be hard to read. Use Automatic text color or adjust the background.','welcome');
+        }
+        const urls = [...C.templates.flatMap(t=>[t.canva,t.figma]),...C.guides.map(g=>g.url),...C.figmaFiles.map(g=>g.url),...C.downloads.map(d=>d.url)];
+        const invalidLink = value => { try { const link = new URL(value); return !['http:', 'https:'].includes(link.protocol) || !link.hostname; } catch { return true; } };
+        if (urls.some(url=>url && invalidLink(url))) add('warn','Some links are invalid. Use a complete http:// or https:// address.','handoff');
         // Hero and 3D
         if (C.hero.bg === "image" && !C.hero.image)
           add("warn", "Hero background is set to Image, but no image is added", "welcome");
@@ -6289,6 +6332,7 @@
         const active = document.activeElement?.id;
         p.innerHTML = panelHTML();
         enhancePanel();
+        seedUndo();
         p.scrollTop = y;
         if (window.matchMedia("(max-width:900px)").matches) window.scrollTo(0, winY);
         if (active) document.getElementById(active)?.focus({ preventScroll: true });
@@ -8060,6 +8104,7 @@ Questions: ${cfg.contacts.map((p) => `${p.name} <${p.email}>`).join(", ")}
             const mine = cur && snap.docs.find((d) => d.id === cur.id);
             if (mine && !dirty && !mine.metadata.hasPendingWrites && mine.data().rev !== lastRev) {
               cur.config = normalize(clone(mine.data().config));
+              beginWorkflowClient(true);
               lastRev = mine.data().rev;
               renderPanel();
               refreshPreview();

@@ -24,3 +24,22 @@
 .github-dialog footer span { flex:1; }
 
 .background-presets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}.background-presets button{border:1px solid #d9dce5;border-radius:8px;padding:6px;background:#fff;color:#172033;font:inherit;font-size:12px;cursor:pointer}.background-presets button[aria-pressed="true"]{border:2px solid #f85a26;padding:5px}.background-presets span{display:block;height:55px;border-radius:5px;margin-bottom:6px}
+.workflow-tools { flex-basis:100%; display:flex; flex-wrap:wrap; align-items:center; gap:10px; padding-top:8px; border-top:1px solid var(--line,#e2e8f0); }
+.workflow-actions { display:flex; flex-wrap:wrap; gap:6px; }
+.workflow-actions .btn { font-size:12px; padding:7px 10px; }
+#workflow-state { font-size:12px; margin-left:auto; color:#475569; }
+#workflow-state[data-state="published"] { color:#166534; }
+#workflow-state[data-state="error"] { color:#b91c1c; }
+#workflow-state[data-state="saving"] { color:#92400e; }
+.work.client-view { grid-template-columns:minmax(0,1fr); }
+.work.client-view > .panel { display:none; }
+.workflow-dialog { max-height:85vh; overflow:auto; }
+.workflow-dialog .workflow-list { display:grid; gap:8px; margin:16px 0; max-height:45vh; overflow:auto; }
+.workflow-row { display:flex; align-items:center; gap:8px; padding:12px 0; border-bottom:1px solid #e2e8f0; }
+.workflow-row > span { flex:1; overflow-wrap:anywhere; min-width:0; }
+.workflow-row .btn { flex-shrink:0; }
+.workflow-close { margin-top:12px; }
+.search-result { white-space:normal; text-align:left; }
+.setting-found { outline:3px solid #f97316!important; outline-offset:3px; }
+.image-crop-controls { padding:10px; border:1px solid var(--line,#e2e8f0); border-radius:8px; margin:10px 0; }
+@media(max-width:700px) { #workflow-state { margin-left:0; width:100%; } .workflow-row { flex-wrap:wrap; } .workflow-row > span { flex-basis:100%; } }

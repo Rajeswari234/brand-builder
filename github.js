@@ -2,7 +2,7 @@
    The access token stays in this browser's storage. It is never written to a project,
    a client page, an export, or the repository. */
 const GITHUB_STORE = 'bb-github';
-const EDITOR_FILES = ['index.html', 'builder.js', 'builder.css', 'github.js'];
+const EDITOR_FILES = ['index.html', 'builder.js', 'builder.css', 'github.js', 'workflow.js'];
 let github = readGithubSettings();
 const livePages = new Set();
 
